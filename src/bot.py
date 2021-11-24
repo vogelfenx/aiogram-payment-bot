@@ -44,15 +44,9 @@ async def offer_subscription(message: types.Message):
                                 reply=False)
 
 
-@dispatcher.message_handler(state=payment_states.PAID.name)
-async def send_yes_or_no_image(message: types.Message):
-    """Answer yes or no using yes / no wtf api"""
-    image_url = services.fetch_yes_or_no_image()
-    await bot.send_animation(message.from_user.id, image_url)
-
-
 @dispatcher.callback_query_handler(state=payment_states.NOT_PAID.name, text='subscribe')
 async def subscribe(call: types.CallbackQuery):
+    """Send payment invoice"""
     await bot.delete_message(call.from_user.id, call.message.message_id)
     await bot.send_message(call.from_user.id,
                            text='Используй для теста карту:\n1111 1111 1111 1026\n11/21\nCVC: 000 ')
@@ -68,16 +62,24 @@ async def subscribe(call: types.CallbackQuery):
 
 @dispatcher.pre_checkout_query_handler(state=payment_states.NOT_PAID.name)
 async def process_pre_checkout_query(pre_checkput_query: types.PreCheckoutQuery):
-    """Do final confirmation to complete payment process"""
+    """Do final confirmation to complete payment process."""
     await bot.answer_pre_checkout_query(pre_checkput_query.id, ok=True)
 
 
 @dispatcher.message_handler(state=payment_states.NOT_PAID.name, content_types=ContentType.SUCCESSFUL_PAYMENT)
 async def process_payment(message: types.Message):
+    """Process successful payment."""
     if message.successful_payment.invoice_payload == 'channel_subscription':
         state = dispatcher.current_state(user=message.from_user.id)
         await state.set_state('PAID')
         await bot.send_message(message.from_user.id, "Подписка оформлена. Напиши любой вопрос.")
+
+
+@dispatcher.message_handler(state=payment_states.PAID.name)
+async def send_yes_or_no_image(message: types.Message):
+    """Answer yes or no using yes / no wtf api"""
+    image_url = services.fetch_yes_or_no_image()
+    await bot.send_animation(message.from_user.id, image_url)
 
 if __name__ == '__main__':
     executor.start_polling(dispatcher, skip_updates=True)
